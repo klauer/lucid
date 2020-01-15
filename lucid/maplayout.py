@@ -280,15 +280,41 @@ def validate(scene, shapes):
 
 
 def layout_instantiated_map(scene, instantiated):
-    # TODO: shorthand for anchor in all directions
     merged_layout = copy.deepcopy(instantiated['merged_layout'])
     maploader._dereference_anchors(instantiated['groups'], merged_layout)
     name_to_widget = instantiated['name_to_widget']
 
     name_to_proxy = {name: scene.addWidget(widget)
                      for name, widget in name_to_widget.items()}
-    print(name_to_proxy)
-    root = build_tree(name_to_proxy, merged_layout)
-    layout(scene, root, root)
-    connect_widgets(scene, root)
 
+    group_trees = {}
+    for group_name, group in instantiated['groups'].items():
+        logger.debug('Building a tree for group: %s', group_name)
+        widgets = group['widgets']
+        anchors = group['anchors']
+
+        print('w', widgets)
+        print('a', anchors)
+        print('l', group['layout'])
+
+        tree_name_to_proxy = {
+            widget_name: name_to_proxy[widget_name]
+            for widget_name, widget in widgets.items()
+        }
+
+        root = build_tree(tree_name_to_proxy, group['layout'])
+        group_trees[group_name] = root
+        layout(scene, root, root)
+
+        connect_widgets(scene, root)
+
+    top_level_items = {
+        group_name: group.group
+        for group_name, group in group_trees.items()
+    }
+    for name, component in instantiated['components'].items():
+        if name not in top_level_items:
+            top_level_items[name] = name_to_proxy[name]
+
+    top_level_tree = build_tree(top_level_items, instantiated['layout'])
+    layout(scene, root, root)
